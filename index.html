@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Web Karaoke & Syllable Studio</title>
+  <style>
+    /* =========================================================
+       1. STAGE CSS
+       ========================================================= */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+      color: #fff;
+      font-family: "Hiragino Kaku Gothic ProN", "Meiryo", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      overflow: hidden;
+    }
+
+    :root {
+      --wipe-fill-color: #ffaa00;
+      --wipe-stroke-color: #781800;
+      --wipe-shadow: rgba(255, 170, 0, 0.85);
+      --base-text-color: #ffffff;
+      --base-stroke-color: #000000;
+      --countdown-dot-color: #ff2a5f;
+    }
+
+    #karaoke-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      background: radial-gradient(circle at center, #1b263b 0%, #070d18 100%);
+      cursor: pointer;
+    }
+
+    video#bg-video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      opacity: 0.82;
+      display: none;
+    }
+
+    .stage-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.72) 100%);
+      z-index: 2;
+    }
+
+    #lyrics-container {
+      position: relative;
+      z-index: 10;
+      width: 92%;
+      max-width: 1280px;
+      margin: 0 auto 120px auto;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+      pointer-events: none;
+    }
+
+    .lyric-row {
+      min-height: 85px;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+
+    #row-top {
+      justify-content: flex-start;
+      padding-left: 4%;
+    }
+
+    #row-bottom {
+      justify-content: flex-end;
+      padding-right: 4%;
+    }
+
+    .countdown-indicator {
+      display: inline-flex;
+      gap: 12px;
+      margin-right: 20px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .countdown-indicator.active {
+      opacity: 1;
+    }
+
+    .dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: #444;
+      box-shadow: 0 0 4px rgba(0,0,0,0.8);
+      transition: background-color 0.1s, transform 0.1s;
+    }
+
+    .dot.lit {
+      background-color: var(--countdown-dot-color);
+      box-shadow: 0 0 14px var(--countdown-dot-color);
+      transform: scale(1.22);
+    }
+
+    .lyric-box {
+      position: relative;
+      display: inline-block;
+      white-space: nowrap;
+      font-size: 46px;
+      font-weight: 900;
+      letter-spacing: 2px;
+    }
+
+    ruby {
+      display: ruby !important;
+      ruby-position: over !important;
+      ruby-align: center;
+      line-height: 1.8;
+    }
+
+    rt {
+      display: ruby-text !important;
+      font-size: 0.42em;
+      font-weight: bold;
+      text-align: center;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .lyric-base-layer {
+      color: var(--base-text-color);
+      text-shadow: 
+        -3px -3px 0 var(--base-stroke-color), 3px -3px 0 var(--base-stroke-color),
+        -3px  3px 0 var(--base-stroke-color), 3px  3px 0 var(--base-stroke-color),
+        0px 4px 10px rgba(0,0,0,0.9);
+    }
+
+    .lyric-fill-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      color: var(--wipe-fill-color);
+      text-shadow: 
+        -3px -3px 0 var(--wipe-stroke-color), 3px -3px 0 var(--wipe-stroke-color),
+        -3px  3px 0 var(--wipe-stroke-color), 3px  3px 0 var(--wipe-stroke-color),
+        0 0 16px var(--wipe-shadow);
+      clip-path: inset(0 100% 0 0);
+      pointer-events: none;
+    }
+
+    /* =========================================================
+       2. DENMOKU CSS
+       ========================================================= */
+    #denmoku-bar {
+      position: relative;
+      z-index: 20;
+      width: 100%;
+      height: 75px;
+      background: rgba(13, 17, 23, 0.96);
+      border-top: 1px solid #2d3748;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      gap: 10px;
+      cursor: default;
+    }
+
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: #212936;
+      color: #e2e8f0;
+      border: 1px solid #4a5568;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      background: #3182ce;
+      color: #fff;
+      border-color: #63b3ed;
+    }
+
+    .btn-primary {
+      background: #e53e3e;
+      border-color: #fc8181;
+    }
+    .btn-primary:hover {
+      background: #c53030;
+    }
+
+    .btn-active {
+      background: #38a169 !important;
+      border-color: #68d391 !important;
+      color: #fff !important;
+    }
+
+    .btn-xs {
+      padding: 3px 6px;
+      font-size: 11px;
+      background: #2d3748;
+      border: 1px solid #4a5568;
+      color: #e2e8f0;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .btn-xs:hover { background: #4a5568; }
+
+    .time-label {
+      font-family: monospace;
+      font-size: 13px;
+      color: #a0aec0;
+      min-width: 90px;
+    }
+
+    .seek-slider {
+      width: 180px;
+      height: 6px;
+      cursor: pointer;
+      accent-color: #e53e3e;
+    }
+
+    .echo-slider {
+      width: 65px;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+
+    .media-btn-combo {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .file-btn-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+    }
+    .file-btn-wrapper input[type=file] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .btn-unload {
+      background: #e53e3e;
+      color: #fff;
+      border: 1px solid #fc8181;
+      border-left: none;
+      padding: 6px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-unload:hover {
+      background: #9b2c2c;
+    }
+
+    /* =========================================================
+       3. EDITOR CSS
+       ========================================================= */
+    #editor-drawer {
+      position: fixed;
+      top: 0;
+      right: -620px;
+      width: 620px;
+      height: calc(100% - 75px);
+      background: rgba(18, 24, 34, 0.98);
+      border-left: 2px solid #3b4a61;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      box-shadow: -10px 0 30px rgba(0,0,0,0.85);
+      user-select: auto;
+      cursor: default;
+    }
+
+    #editor-drawer.open {
+      right: 0;
+    }
+
+    .editor-header {
+      padding: 14px 16px;
+      background: #131a24;
+      border-bottom: 1px solid #2d3748;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .editor-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .editor-toolbar {
+      padding: 12px 16px;
+      background: #131a24;
+      border-top: 1px solid #2d3748;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .editor-line-card {
+      background: #1b2433;
+      border: 1px solid #37475d;
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .editor-line-card.selected {
+      border-color: #fc8181;
+      background: #232e42;
+    }
+
+    .syllables-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 4px 0;
+    }
+
+    .syllable-pill {
+      background: #0d131d;
+      border: 1px solid #4a5568;
+      border-radius: 4px;
+      padding: 4px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      min-width: 38px;
+    }
+    .syllable-pill.active-syl {
+      border-color: #ffaa00;
+      background: #3b2d13;
+    }
+    .syllable-char {
+      font-size: 15px;
+      font-weight: bold;
+    }
+    .syllable-dur {
+      font-size: 10px;
+      font-family: monospace;
+      color: #38bdf8;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 主舞台區 (點擊舞台切換播放/暫停) -->
+  <div id="karaoke-stage">
+    <video id="bg-video" playsinline></video>
+    <audio id="bg-audio"></audio>
+    <div class="stage-overlay"></div>
+
+    <!-- 雙行交替字幕區 -->
+    <div id="lyrics-container">
+      <div id="row-top" class="lyric-row">
+        <div class="countdown-indicator" id="countdown-top">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+        <div class="lyric-box">
+          <div class="lyric-base-layer" id="base-top"></div>
+          <div class="lyric-fill-layer" id="fill-top"></div>
+        </div>
+      </div>
+
+      <div id="row-bottom" class="lyric-row">
+        <div class="countdown-indicator" id="countdown-bottom">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+        <div class="lyric-box">
+          <div class="lyric-base-layer" id="base-bottom"></div>
+          <div class="lyric-fill-layer" id="fill-bottom"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部控制台 (Denmoku) -->
+    <div id="denmoku-bar">
+      <div class="ctrl-group">
+        <button id="btn-play" class="btn btn-primary">▶ 播放</button>
+        <button id="btn-stop" class="btn">■</button>
+        <button id="btn-step-sub5" class="btn-xs" title="快退5秒">-5s</button>
+        <button id="btn-step-sub1" class="btn-xs" title="快退1秒">-1s</button>
+        <button id="btn-step-add1" class="btn-xs" title="快進1秒">+1s</button>
+        <button id="btn-step-add5" class="btn-xs" title="快進5秒">+5s</button>
+        <span class="time-label" id="time-text">00:00 / 00:00</span>
+        <input type="range" id="seek-bar" class="seek-slider" value="0" min="0" max="100" step="0.1">
+      </div>
+
+      <div class="ctrl-group">
+        <button id="btn-toggle-mic" class="btn">🎤 麥克風</button>
+        <span style="font-size: 11px; color: #a0aec0;">回音:</span>
+        <input type="range" id="slider-mic-echo" class="echo-slider" min="0" max="100" value="15">
+        <span id="echo-val-text" style="font-size: 11px; color: #38bdf8; width: 26px;">15%</span>
+      </div>
+
+      <div class="ctrl-group">
+        <!-- 影片按鈕組 (含卸載) -->
+        <div class="media-btn-combo">
+          <div class="file-btn-wrapper">
+            <button class="btn" id="btn-video-label">📂 影片</button>
+            <input type="file" id="video-input" accept="video/*">
+          </div>
+          <button class="btn-unload" id="btn-unload-video" style="display: none;" title="卸載影片">✕</button>
+        </div>
+
+        <!-- 伴奏按鈕組 (含卸載) -->
+        <div class="media-btn-combo">
+          <div class="file-btn-wrapper">
+            <button class="btn" id="btn-audio-label">🎵 伴奏</button>
+            <input type="file" id="audio-input" accept="audio/*">
+          </div>
+          <button class="btn-unload" id="btn-unload-audio" style="display: none;" title="卸載伴奏">✕</button>
+        </div>
+
+        <div class="file-btn-wrapper">
+          <button class="btn">📝 LRC</button>
+          <input type="file" id="lrc-input" accept=".lrc,.txt">
+        </div>
+
+        <!-- 對齊字幕按鈕組 (含動態卸載) -->
+        <div class="media-btn-combo">
+          <div class="file-btn-wrapper">
+            <button class="btn" id="btn-aligned-label" style="background: #2c5282;">📥 匯入對齊 (JSON/ASS)</button>
+            <input type="file" id="aligned-input" accept=".json,.ass,.txt">
+          </div>
+          <button class="btn-unload" id="btn-unload-aligned" style="display: none;" title="卸載字幕">✕</button>
+        </div>  
+
+        <button id="btn-toggle-editor" class="btn" style="background: #2b6cb0;">🛠 軌道編輯</button>
+        <button id="btn-fullscreen" class="btn">⛶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DAW 音節編輯抽屜 -->
+  <div id="editor-drawer">
+    <div class="editor-header">
+      <div>
+        <h3 style="font-size: 15px; color: #63b3ed;">音節時間軸調校器</h3>
+        <span style="font-size: 11px; color: #a0aec0;">播放中敲擊 [Space] 可逐字打點記錄快慢</span>
+      </div>
+      <button id="btn-close-editor" class="btn-xs">✕ 關閉</button>
+    </div>
+
+    <div class="editor-body" id="editor-list"></div>
+
+    <div class="editor-toolbar">
+      <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <span style="font-size: 12px; color: #cbd5e0;">單字時長微調:</span>
+        <div>
+          <button class="btn-xs" id="btn-dur-sub-big">-0.2s</button>
+          <button class="btn-xs" id="btn-dur-sub">-0.05s</button>
+          <button class="btn-xs" id="btn-dur-add">+0.05s</button>
+          <button class="btn-xs" id="btn-dur-add-big">+0.2s</button>
+        </div>
+      </div>
+      <button id="btn-tap-syllable" class="btn btn-primary" style="flex: 1;">⏺ 逐字打點 (Space)</button>
+      <button id="btn-apply-editor" class="btn" style="background: #2b6cb0; flex: 1;">⚡ 套用變更</button>
+      <button id="btn-export-json" class="btn" style="width: 100%;">💾 匯出卡拉OK專案 JSON</button>
+    </div>
+  </div>
+
+  <!-- 原生 JavaScript 整合邏輯 -->
+  <script>
+    // =========================================================
+    // 1. AudioEngine 模組
+    // =========================================================
+    class AudioEngine {
+      constructor() {
+        this.audioCtx = null;
+        this.synthStartTime = 0;
+        this.synthCurrentTime = 0;
+        this.isPlaying = false;
+        this.isUsingCustomAudio = false;
+        this.playbackSpeed = 1.0;
+
+        this.micStream = null;
+        this.micGain = null;
+        this.micDelay = null;
+        this.micFeedback = null;
+        this.micWetGain = null;
+        this.isMicActive = false;
+
+        this.lastChord = -1;
+      }
+
+      init() {
+        if (!this.audioCtx) {
+          const AudioClass = window.AudioContext || window.webkitAudioContext;
+          this.audioCtx = new AudioClass();
+        }
+        if (this.audioCtx.state === 'suspended') {
+          this.audioCtx.resume();
+        }
+      }
+
+      getCurrentTime(bgAudio) {
+        if (this.isUsingCustomAudio) return bgAudio.currentTime;
+
+        const bgVideo = document.getElementById('bg-video');
+        if (bgVideo && bgVideo.src && !this.isUsingCustomAudio) {
+          return bgVideo.currentTime;
+        }
+
+        if (!this.isPlaying) return this.synthCurrentTime;
+        return this.synthCurrentTime + (this.audioCtx.currentTime - this.synthStartTime) * this.playbackSpeed;
+      }
+
+      getDuration(bgAudio) {
+        if (this.isUsingCustomAudio && bgAudio.duration && !isNaN(bgAudio.duration)) {
+          return bgAudio.duration;
+        }
+
+        const bgVideo = document.getElementById('bg-video');
+        if (bgVideo && bgVideo.duration && !isNaN(bgVideo.duration)) {
+          return bgVideo.duration;
+        }
+
+        if (typeof lyricTimeline !== 'undefined' && lyricTimeline.length > 0) {
+          const lastLine = lyricTimeline[lyricTimeline.length - 1];
+          const lastEnd = lastLine.start + lastLine.syllables.reduce((a, b) => a + b.dur, 0);
+          return Math.max(18.0, Math.ceil(lastEnd + 3.0));
+        }
+
+        return 18.0;
+      }
+
+      playSyntheticChords(t) {
+        if (this.isUsingCustomAudio || !this.audioCtx) return;
+        const chords = [
+          [53, 60, 65, 69], // Fmaj7
+          [55, 59, 62, 67], // G
+          [52, 55, 59, 64], // Em7
+          [57, 60, 64, 69]  // Am
+        ];
+        const idx = Math.floor((t / 2.0) % chords.length);
+        if (idx !== this.lastChord) {
+          this.lastChord = idx;
+          chords[idx].forEach(midi => {
+            try {
+              const osc = this.audioCtx.createOscillator();
+              const g = this.audioCtx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(440 * Math.pow(2, (midi - 69) / 12), this.audioCtx.currentTime);
+              g.gain.setValueAtTime(0.001, this.audioCtx.currentTime);
+              g.gain.linearRampToValueAtTime(0.04, this.audioCtx.currentTime + 0.06);
+              g.exponentialRampToValueAtTime(0.0001, this.audioCtx.currentTime + 1.9);
+              osc.connect(g);
+              g.connect(this.audioCtx.destination);
+              osc.start();
+              osc.stop(this.audioCtx.currentTime + 1.95);
+            } catch(e) {}
+          });
+        }
+      }
+
+      async toggleMicrophone(userDepthPercent) {
+        this.init();
+        if (!this.isMicActive) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            });
+            this.micStream = stream;
+            const source = this.audioCtx.createMediaStreamSource(stream);
+
+            this.micGain = this.audioCtx.createGain();
+            this.micGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+
+            const hpFilter = this.audioCtx.createBiquadFilter();
+            hpFilter.type = 'highpass';
+            hpFilter.frequency.setValueAtTime(130, this.audioCtx.currentTime);
+
+            this.micDelay = this.audioCtx.createDelay();
+            this.micDelay.delayTime.setValueAtTime(0.115, this.audioCtx.currentTime);
+
+            const lpFilter = this.audioCtx.createBiquadFilter();
+            lpFilter.type = 'lowpass';
+            lpFilter.frequency.setValueAtTime(3200, this.audioCtx.currentTime);
+
+            this.micFeedback = this.audioCtx.createGain();
+            const safeFb = (userDepthPercent / 100) * 0.16;
+            this.micFeedback.gain.setValueAtTime(safeFb, this.audioCtx.currentTime);
+
+            this.micWetGain = this.audioCtx.createGain();
+            this.micWetGain.gain.setValueAtTime((userDepthPercent / 100) * 0.35, this.audioCtx.currentTime);
+
+            source.connect(this.micGain);
+            this.micGain.connect(this.audioCtx.destination);
+
+            source.connect(hpFilter);
+            hpFilter.connect(this.micDelay);
+            this.micDelay.connect(lpFilter);
+            lpFilter.connect(this.micFeedback);
+            this.micFeedback.connect(this.micDelay);
+
+            lpFilter.connect(this.micWetGain);
+            this.micWetGain.connect(this.audioCtx.destination);
+
+            this.isMicActive = true;
+            return true;
+          } catch (err) {
+            alert("無法接取麥克風: " + err.message);
+            return false;
+          }
+        } else {
+          if (this.micStream) this.micStream.getTracks().forEach(t => t.stop());
+          this.isMicActive = false;
+          return false;
+        }
+      }
+
+      setEchoDepth(percent) {
+        if (this.isMicActive && this.micFeedback && this.micWetGain) {
+          this.micFeedback.gain.setValueAtTime((percent / 100) * 0.16, this.audioCtx.currentTime);
+          this.micWetGain.gain.setValueAtTime((percent / 100) * 0.35, this.audioCtx.currentTime);
+        }
+      }
+    }
+
+    const audioEngine = new AudioEngine();
+
+    // =========================================================
+    // 2. KaraokeRenderer 模組 (4.0s 門檻進場與前奏/長間奏乾淨畫面)
+    // =========================================================
+    class KaraokeRenderer {
+      constructor(elements) {
+        this.baseTop = elements.baseTop;
+        this.fillTop = elements.fillTop;
+        this.baseBottom = elements.baseBottom;
+        this.fillBottom = elements.fillBottom;
+        this.countTop = elements.countTop;
+        this.countBottom = elements.countBottom;
+        this.timeText = elements.timeText;
+        this.seekBar = elements.seekBar;
+      }
+
+      formatTime(sec) {
+        if (!sec || isNaN(sec) || sec < 0) sec = 0;
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = Math.floor(sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+      }
+
+      buildRubyHTML(line) {
+        return line.syllables.map(s => {
+          if (s.ruby && s.ruby.trim() !== "") {
+            return `<ruby>${s.text}<rt>${s.ruby}</rt></ruby>`;
+          }
+          return s.text;
+        }).join('');
+      }
+
+      getLineEndTime(line) {
+        const totalDur = line.syllables.reduce((acc, cur) => acc + cur.dur, 0);
+        return line.start + totalDur;
+      }
+
+      calculateProgressPercent(line, currTime) {
+        const relTime = currTime - line.start;
+        if (relTime <= 0) return 0;
+        const totalDur = line.syllables.reduce((acc, cur) => acc + cur.dur, 0);
+        if (relTime >= totalDur) return 100;
+
+        let acc = 0;
+        const totalCount = line.syllables.length;
+        for (let i = 0; i < totalCount; i++) {
+          const s = line.syllables[i];
+          if (relTime >= acc + s.dur) {
+            acc += s.dur;
+          } else {
+            const ratioInSyllable = (relTime - acc) / s.dur;
+            const completedRatio = (i + ratioInSyllable) / totalCount;
+            return completedRatio * 100;
+          }
+        }
+        return 100;
+      }
+
+      updateDisplay(curr, dur, lyricTimeline) {
+        if (!dur || dur <= 0) dur = 1;
+        this.timeText.textContent = `${this.formatTime(curr)} / ${this.formatTime(dur)}`;
+        this.seekBar.value = (curr / dur) * 100;
+
+        const clearCountdownDots = () => {
+          this.countTop.classList.remove('active');
+          this.countBottom.classList.remove('active');
+          this.countTop.querySelectorAll('.dot').forEach(d => d.classList.remove('lit'));
+          this.countBottom.querySelectorAll('.dot').forEach(d => d.classList.remove('lit'));
+        };
+
+        let activeIndex = -1;
+        for (let i = 0; i < lyricTimeline.length; i++) {
+          const end = this.getLineEndTime(lyricTimeline[i]);
+          if (curr >= lyricTimeline[i].start && curr <= end) {
+            activeIndex = i;
+            break;
+          }
+        }
+
+        // 狀態 A：正在演唱某一唱句
+        if (activeIndex !== -1) {
+          clearCountdownDots();
+
+          const line = lyricTimeline[activeIndex];
+          const isEven = (activeIndex % 2 === 0);
+          const p = this.calculateProgressPercent(line, curr);
+
+          const currentBase = isEven ? this.baseTop : this.baseBottom;
+          const currentFill = isEven ? this.fillTop : this.fillBottom;
+          const otherBase = isEven ? this.baseBottom : this.baseTop;
+          const otherFill = isEven ? this.fillBottom : this.fillTop;
+
+          // 跳轉至句中時立即強制掛載字體與 Ruby
+          if (currentBase.getAttribute('data-line') !== String(activeIndex)) {
+            currentBase.innerHTML = this.buildRubyHTML(line);
+            currentFill.innerHTML = this.buildRubyHTML(line);
+            currentBase.setAttribute('data-line', activeIndex);
+          }
+          currentFill.style.clipPath = `inset(0 ${100 - p}% 0 0)`;
+
+          // 下一句預告判斷：只有下一句在 4.0 秒內才允許掛載出來，否則清空
+          if (activeIndex + 1 < lyricTimeline.length) {
+            const next = lyricTimeline[activeIndex + 1];
+            const timeToNext = next.start - curr;
+
+            if (timeToNext <= 4.0) {
+              if (otherBase.getAttribute('data-line') !== String(activeIndex + 1)) {
+                otherBase.innerHTML = this.buildRubyHTML(next);
+                otherFill.innerHTML = this.buildRubyHTML(next);
+                otherBase.setAttribute('data-line', activeIndex + 1);
+                otherFill.style.clipPath = 'inset(0 100% 0 0)';
+              }
+            } else {
+              otherBase.innerHTML = '';
+              otherFill.innerHTML = '';
+              otherBase.removeAttribute('data-line');
+            }
+          } else {
+            otherBase.innerHTML = '';
+            otherFill.innerHTML = '';
+            otherBase.removeAttribute('data-line');
+          }
+        } else {
+          // 狀態 B：間奏或空白等待期（例如前奏 0~30 秒）
+          this.fillTop.style.clipPath = 'inset(0 100% 0 0)';
+          this.fillBottom.style.clipPath = 'inset(0 100% 0 0)';
+
+          let foundUpcoming = false;
+          for (let i = 0; i < lyricTimeline.length; i++) {
+            const line = lyricTimeline[i];
+            const diff = line.start - curr;
+            const isEven = (i % 2 === 0);
+            const targetBase = isEven ? this.baseTop : this.baseBottom;
+            const targetFill = isEven ? this.fillTop : this.fillBottom;
+            const targetCount = isEven ? this.countTop : this.countBottom;
+            const otherBase = isEven ? this.baseBottom : this.baseTop;
+            const otherFill = isEven ? this.fillBottom : this.fillTop;
+
+            let hasSignificantInterlude = false;
+            if (i === 0) {
+              hasSignificantInterlude = true;
+            } else {
+              const prevLine = lyricTimeline[i - 1];
+              const prevEnd = this.getLineEndTime(prevLine);
+              if (line.start - prevEnd >= 4.0) {
+                hasSignificantInterlude = true;
+              }
+            }
+
+            // 開唱前嚴格限制在 4.0 秒內才掛出字幕，否則畫面保持乾淨
+            if (diff > 0 && diff <= 4.0) {
+              foundUpcoming = true;
+
+              if (targetBase.getAttribute('data-line') !== String(i)) {
+                targetBase.innerHTML = this.buildRubyHTML(line);
+                targetFill.innerHTML = this.buildRubyHTML(line);
+                targetBase.setAttribute('data-line', i);
+                targetFill.style.clipPath = 'inset(0 100% 0 0)';
+              }
+
+              // 只有在顯著長間奏/前奏時，才在開唱前 1.8 秒亮倒數燈
+              if (hasSignificantInterlude && diff <= 1.8 && diff > 0.08) {
+                targetCount.classList.add('active');
+                const dots = targetCount.querySelectorAll('.dot');
+                dots[0].classList.toggle('lit', diff <= 1.8);
+                dots[1].classList.toggle('lit', diff <= 1.2);
+                dots[2].classList.toggle('lit', diff <= 0.6);
+              } else {
+                clearCountdownDots();
+              }
+
+              otherBase.innerHTML = '';
+              otherFill.innerHTML = '';
+              otherBase.removeAttribute('data-line');
+              break;
+            }
+          }
+
+          // 若處於長前奏或長間奏（> 4 秒），徹底清空字幕與倒數燈
+          if (!foundUpcoming) {
+            clearCountdownDots();
+            this.baseTop.innerHTML = '';
+            this.fillTop.innerHTML = '';
+            this.baseBottom.innerHTML = '';
+            this.fillBottom.innerHTML = '';
+            this.baseTop.removeAttribute('data-line');
+            this.baseBottom.removeAttribute('data-line');
+          }
+        }
+      }
+
+      reset() {
+        this.fillTop.style.clipPath = 'inset(0 100% 0 0)';
+        this.fillBottom.style.clipPath = 'inset(0 100% 0 0)';
+        this.countTop.classList.remove('active');
+        this.countBottom.classList.remove('active');
+        this.countTop.querySelectorAll('.dot').forEach(d => d.classList.remove('lit'));
+        this.countBottom.querySelectorAll('.dot').forEach(d => d.classList.remove('lit'));
+        this.timeText.textContent = `00:00 / 00:00`;
+        this.seekBar.value = 0;
+        
+        this.baseTop.innerHTML = '';
+        this.fillTop.innerHTML = '';
+        this.baseBottom.innerHTML = '';
+        this.fillBottom.innerHTML = '';
+        this.baseTop.removeAttribute('data-line');
+        this.baseBottom.removeAttribute('data-line');
+      }
+    }
+
+    // =========================================================
+    // 3. SyllableEditor 模組
+    // =========================================================
+    class SyllableEditor {
+      constructor(elements, onTimelineChange) {
+        this.drawer = elements.drawer;
+        this.listContainer = elements.listContainer;
+        this.onTimelineChange = onTimelineChange;
+
+        this.selectedLine = 0;
+        this.selectedSyllable = 0;
+        this.lastTapTime = 0;
+      }
+
+      open() { this.drawer.classList.add('open'); }
+      close() { this.drawer.classList.remove('open'); }
+      toggle() { this.drawer.classList.toggle('open'); }
+
+      render(lyricTimeline) {
+        this.listContainer.innerHTML = '';
+        lyricTimeline.forEach((line, lIdx) => {
+          const totalDur = line.syllables.reduce((acc, cur) => acc + cur.dur, 0);
+          const end = (line.start + totalDur).toFixed(2);
+
+          const card = document.createElement('div');
+          card.className = `editor-line-card ${lIdx === this.selectedLine ? 'selected' : ''}`;
+
+          card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 12px; font-weight: bold; color: #cbd5e0;">行 #${lIdx + 1} (${line.start.toFixed(2)}s ~ ${end}s)</span>
+              <div>
+                <button class="btn-xs btn-adj-start" data-lidx="${lIdx}" data-delta="-0.1">-0.1s 起</button>
+                <button class="btn-xs btn-adj-start" data-lidx="${lIdx}" data-delta="0.1">+0.1s 起</button>
+              </div>
+            </div>
+            <div class="syllables-container">
+              ${line.syllables.map((s, sIdx) => `
+                <div class="syllable-pill ${lIdx === this.selectedLine && sIdx === this.selectedSyllable ? 'active-syl' : ''}" data-lidx="${lIdx}" data-sidx="${sIdx}">
+                  <span class="syllable-char">${s.text}${s.ruby ? `<span style="font-size:10px; color:#ffaa00;">[${s.ruby}]</span>` : ''}</span>
+                  <span class="syllable-dur">${s.dur.toFixed(2)}s</span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+
+          card.querySelectorAll('.syllable-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+              this.selectedLine = parseInt(pill.getAttribute('data-lidx'));
+              this.selectedSyllable = parseInt(pill.getAttribute('data-sidx'));
+              this.render(lyricTimeline);
+            });
+          });
+
+          card.querySelectorAll('.btn-adj-start').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const lIdx = parseInt(btn.getAttribute('data-lidx'));
+              const delta = parseFloat(btn.getAttribute('data-delta'));
+              lyricTimeline[lIdx].start = Math.max(0, +(lyricTimeline[lIdx].start + delta).toFixed(2));
+              this.render(lyricTimeline);
+            });
+          });
+
+          this.listContainer.appendChild(card);
+        });
+      }
+
+      adjustDuration(lyricTimeline, delta) {
+        if (!lyricTimeline[this.selectedLine]) return;
+        const s = lyricTimeline[this.selectedLine].syllables[this.selectedSyllable];
+        if (s) {
+          s.dur = Math.max(0.05, +(s.dur + delta).toFixed(2));
+          this.render(lyricTimeline);
+        }
+      }
+
+      tapSyllable(lyricTimeline, now) {
+        const currentLine = lyricTimeline[this.selectedLine];
+        if (!currentLine) return;
+
+        if (this.selectedSyllable === 0) {
+          currentLine.start = +now.toFixed(2);
+          this.lastTapTime = now;
+          this.selectedSyllable++;
+        } else {
+          const diff = Math.max(0.08, +(now - this.lastTapTime).toFixed(2));
+          currentLine.syllables[this.selectedSyllable - 1].dur = diff;
+          this.lastTapTime = now;
+
+          if (this.selectedSyllable < currentLine.syllables.length - 1) {
+            this.selectedSyllable++;
+          } else {
+            currentLine.syllables[this.selectedSyllable].dur = 1.5;
+            if (this.selectedLine + 1 < lyricTimeline.length) {
+              this.selectedLine++;
+              this.selectedSyllable = 0;
+            }
+          }
+        }
+        this.render(lyricTimeline);
+      }
+    }
+
+    // =========================================================
+    // 4. 解析器模組 (Word 級別完整注音抽取與漢字黏合)
+    // =========================================================
+    function parseLRC(text) {
+      const lines = text.split('\n');
+      const timeRegex = /\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]/g;
+      const parsed = [];
+
+      for (const line of lines) {
+        let match;
+        const tags = [];
+        while ((match = timeRegex.exec(line)) !== null) {
+          const m = parseInt(match[1]);
+          const s = parseInt(match[2]);
+          const ms = match[3] ? parseInt(match[3].padEnd(3, '0')) : 0;
+          tags.push(m * 60 + s + ms / 1000);
+        }
+        const textOnly = line.replace(timeRegex, '').trim();
+        if (textOnly && tags.length > 0) {
+          for (const t of tags) parsed.push({ time: t, text: textOnly });
+        }
+      }
+
+      parsed.sort((a, b) => a.time - b.time);
+
+      return parsed.map((curr, idx) => {
+        let nextTime = (idx + 1 < parsed.length) ? parsed[idx + 1].time : curr.time + 4.5;
+        if (nextTime - curr.time > 7.0) nextTime = curr.time + 5.0;
+        const totalLineDur = Math.max(1.0, nextTime - curr.time);
+
+        const chars = Array.from(curr.text);
+        const perCharDur = +(totalLineDur / chars.length).toFixed(2);
+
+        return {
+          start: +curr.time.toFixed(2),
+          syllables: chars.map((c, cIdx) => ({
+            text: c,
+            ruby: "",
+            dur: (cIdx === chars.length - 1) ? +(perCharDur * 1.5).toFixed(2) : perCharDur
+          }))
+        };
+      });
+    }
+
+    // 徹底修正：Word 級別完整注音抽取與漢字黏合，同行聚合且無延遲
+    function parseASS(assText) {
+      const lines = assText.split('\n');
+      const mainEvents = [];
+      const rubyEvents = [];
+
+      function assTimeToSec(tStr) {
+        const parts = tStr.trim().split(':');
+        if (parts.length < 3) return 0;
+        return +(parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2])).toFixed(2);
+      }
+
+      for (const rawLine of lines) {
+        if (!rawLine.startsWith('Dialogue:')) continue;
+        const parts = rawLine.substring(9).split(',');
+        if (parts.length < 10) continue;
+
+        const start = assTimeToSec(parts[1]);
+        const end = assTimeToSec(parts[2]);
+        const style = parts[3].trim();
+        const text = parts.slice(9).join(',').trim();
+
+        const posMatch = text.match(/\\pos\(([\d.]+),\s*([\d.]+)\)/);
+        const posX = posMatch ? parseFloat(posMatch[1]) : 0;
+        const posY = posMatch ? parseFloat(posMatch[2]) : 0;
+
+        if (style === 'KMain') {
+          mainEvents.push({ start, end, text, posX, posY });
+        } else if (style === 'KRuby') {
+          rubyEvents.push({ start, end, text, posX, posY });
+        }
+      }
+
+      // 同時間區間的 KMain 行聚集為整句
+      const sentenceGroups = [];
+      mainEvents.forEach(me => {
+        let g = sentenceGroups.find(sg => Math.abs(sg.start - me.start) < 0.8 && Math.abs(sg.posY - me.posY) < 25);
+        if (!g) {
+          g = { start: me.start, end: me.end, posY: me.posY, items: [] };
+          sentenceGroups.push(g);
+        }
+        g.items.push(me);
+      });
+
+      sentenceGroups.sort((a, b) => a.start - b.start);
+
+      const timeline = [];
+
+      sentenceGroups.forEach(g => {
+        g.items.sort((a, b) => a.posX - b.posX);
+
+        // 提取該句的所有 KRuby Event，保留整串注音字串（例如 "とお", "こころ"）
+        const matchingRuby = rubyEvents.filter(r => Math.abs(r.start - g.start) < 0.8);
+        matchingRuby.sort((a, b) => a.posX - b.posX);
+
+        const rubyWords = matchingRuby.map(mr => {
+          return mr.text.replace(/\{[^}]+\}/g, '').trim();
+        }).filter(w => w.length > 0);
+
+        let rubyWordIdx = 0;
+        const lineSyllables = [];
+        let sentenceActualStart = null;
+
+        g.items.forEach((item, itemIdx) => {
+          const parsedItem = extractSylsFromTextWithDelay(item.text);
+
+          // 第一個分詞的前置等待延遲直接修正到開唱時間
+          if (itemIdx === 0 && sentenceActualStart === null) {
+            sentenceActualStart = +(g.start + parsedItem.initialDelay).toFixed(2);
+          }
+
+          const wordText = parsedItem.syls.map(s => s.char).join('');
+          const hasKanji = /[\u4e00-\u9faf]/.test(wordText);
+
+          let wordRuby = "";
+          if (hasKanji && rubyWordIdx < rubyWords.length) {
+            wordRuby = rubyWords[rubyWordIdx];
+            rubyWordIdx++;
+          }
+
+          parsedItem.syls.forEach(ms => {
+            let assignedRuby = "";
+            if (/[\u4e00-\u9faf]/.test(ms.char) && wordRuby !== "") {
+              assignedRuby = wordRuby; // 第一個漢字吃掉整串注音 (如 "通" 拿到 "とお")
+              wordRuby = "";
+            }
+
+            if (ms.char && ms.char.trim() !== "") {
+              lineSyllables.push({
+                text: ms.char,
+                ruby: assignedRuby,
+                dur: ms.dur
+              });
+            }
+          });
+        });
+
+        if (lineSyllables.length > 0) {
+          timeline.push({
+            start: sentenceActualStart !== null ? sentenceActualStart : g.start,
+            syllables: lineSyllables
+          });
+        }
+      });
+
+      return timeline;
+    }
+
+    function extractSylsFromTextWithDelay(text) {
+      const syls = [];
+      const tagRegex = /\{[^}]*\\k[f|o]?(\d+)[^}]*\}([^\\{]*)/g;
+      let match;
+      let initialDelay = 0;
+      let isFirst = true;
+
+      while ((match = tagRegex.exec(text)) !== null) {
+        const cs = parseInt(match[1]);
+        const dur = Math.max(0.04, +(cs / 100).toFixed(2));
+        const chars = match[2];
+
+        if (isFirst && (!chars || chars.trim() === '')) {
+          initialDelay = dur;
+          isFirst = false;
+          continue;
+        }
+        isFirst = false;
+
+        if (chars && chars.length > 0) {
+          const charArr = Array.from(chars);
+          const perDur = +(dur / charArr.length).toFixed(2);
+          charArr.forEach(c => {
+            syls.push({ char: c, dur: perDur });
+          });
+        }
+      }
+
+      if (syls.length === 0) {
+        const clean = text.replace(/\{[^}]+\}/g, '').trim();
+        return { initialDelay: 0, syls: Array.from(clean).map(c => ({ char: c, dur: 0.2 })) };
+      }
+
+      return { initialDelay, syls };
+    }
+
+    function parseAlignedJSON(content) {
+      try {
+        const raw = typeof content === 'string' ? JSON.parse(content) : content;
+
+        if (raw && raw.format === "kara-align/reading-patch" && Array.isArray(raw.lines)) {
+          let cumulativeTime = 2.0;
+
+          return raw.lines.map((l) => {
+            const syllables = [];
+
+            (l.segments || []).forEach(seg => {
+              const surface = seg.surface;
+              if (!surface || surface.trim() === '') {
+                syllables.push({ text: " ", ruby: "", dur: 0.2 });
+                return;
+              }
+
+              const needsRuby = seg.reading && seg.reading !== surface;
+              const rubyText = needsRuby ? seg.reading : "";
+
+              const charCount = (seg.units && seg.units.length > 0) ? seg.units.length : surface.length;
+              const dur = Math.max(0.15, +(charCount * 0.25).toFixed(2));
+
+              syllables.push({
+                text: surface,
+                ruby: rubyText,
+                dur: dur
+              });
+            });
+
+            const lineStart = +cumulativeTime.toFixed(2);
+            const lineTotalDur = syllables.reduce((sum, s) => sum + s.dur, 0);
+            cumulativeTime += lineTotalDur + 1.8;
+
+            return {
+              start: lineStart,
+              syllables: syllables
+            };
+          });
+        }
+
+        if (Array.isArray(raw)) {
+          return raw.map(line => {
+            const start = parseFloat(line.start) || 0;
+            const syllables = Array.isArray(line.syllables) ? line.syllables : [];
+
+            return {
+              start: +start.toFixed(2),
+              syllables: syllables.map(s => ({
+                text: String(s.text ?? ''),
+                ruby: String(s.ruby ?? ''),
+                dur: Math.max(0.01, +(parseFloat(s.dur) || 0.1).toFixed(2))
+              }))
+            };
+          });
+        }
+
+        throw new Error('未知的 JSON 格式');
+      } catch (err) {
+        console.error('對齊資料解析失敗:', err);
+        return null;
+      }
+    }
+
+    function exportProjectJSON(timeline) {
+      const blob = new Blob([JSON.stringify(timeline, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "karaoke_project.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // =========================================================
+    // 5. 主程式 Application Coordinator
+    // =========================================================
+    const DEMO_PROJECT = [
+      {
+        start: 2.0,
+        syllables: [
+          { text: "見", ruby: "み", dur: 0.3 },
+          { text: "あ", ruby: "", dur: 0.2 },
+          { text: "げ", ruby: "", dur: 0.2 },
+          { text: "た", ruby: "", dur: 0.3 },
+          { text: "夜空", ruby: "よぞら", dur: 0.8 },
+          { text: "に", ruby: "", dur: 0.3 },
+          { text: " ", ruby: "", dur: 0.2 },
+          { text: "星", ruby: "ほし", dur: 0.5 },
+          { text: "が", ruby: "", dur: 0.3 },
+          { text: "流", ruby: "なが", dur: 0.5 },
+          { text: "れ", ruby: "", dur: 0.3 },
+          { text: "てー", ruby: "", dur: 2.2 }
+        ]
+      },
+      {
+        start: 8.5,
+        syllables: [
+          { text: "消", ruby: "き", dur: 0.3 },
+          { text: "え", ruby: "", dur: 0.2 },
+          { text: "な", ruby: "", dur: 0.2 },
+          { text: "い", ruby: "", dur: 0.3 },
+          { text: "願", ruby: "ねが", dur: 0.6 },
+          { text: "い", ruby: "", dur: 0.3 },
+          { text: "を", ruby: "", dur: 0.4 },
+          { text: " ", ruby: "", dur: 0.2 },
+          { text: "ひ", ruby: "", dur: 0.3 },
+          { text: "と", ruby: "", dur: 0.3 },
+          { text: "つ", ruby: "", dur: 0.3 },
+          { text: "だ", ruby: "", dur: 0.4 },
+          { text: "けー", ruby: "", dur: 2.5 }
+        ]
+      }
+    ];
+
+    let lyricTimeline = JSON.parse(JSON.stringify(DEMO_PROJECT));
+
+    const dom = {
+      stage: document.getElementById('karaoke-stage'),
+      bgVideo: document.getElementById('bg-video'),
+      bgAudio: document.getElementById('bg-audio'),
+      btnPlay: document.getElementById('btn-play'),
+      btnStop: document.getElementById('btn-stop'),
+      timeText: document.getElementById('time-text'),
+      seekBar: document.getElementById('seek-bar'),
+      baseTop: document.getElementById('base-top'),
+      fillTop: document.getElementById('fill-top'),
+      baseBottom: document.getElementById('base-bottom'),
+      fillBottom: document.getElementById('fill-bottom'),
+      countTop: document.getElementById('countdown-top'),
+      countBottom: document.getElementById('countdown-bottom'),
+      editorDrawer: document.getElementById('editor-drawer'),
+      editorList: document.getElementById('editor-list'),
+      btnVideoLabel: document.getElementById('btn-video-label'),
+      btnUnloadVideo: document.getElementById('btn-unload-video'),
+      btnAudioLabel: document.getElementById('btn-audio-label'),
+      btnUnloadAudio: document.getElementById('btn-unload-audio'),
+      btnAlignedLabel: document.getElementById('btn-aligned-label'),
+      btnUnloadAligned: document.getElementById('btn-unload-aligned'),
+      videoInput: document.getElementById('video-input'),
+      audioInput: document.getElementById('audio-input'),
+      alignedInput: document.getElementById('aligned-input')
+    };
+
+    const renderer = new KaraokeRenderer(dom);
+    const editor = new SyllableEditor({
+      drawer: dom.editorDrawer,
+      listContainer: dom.editorList
+    }, () => syncCurrentDisplay());
+
+    function syncCurrentDisplay() {
+      const curr = audioEngine.getCurrentTime(dom.bgAudio);
+      const dur = audioEngine.getDuration(dom.bgAudio);
+      renderer.updateDisplay(curr, dur, lyricTimeline);
+    }
+
+    function renderLoop() {
+      if (!audioEngine.isPlaying) return;
+      const curr = audioEngine.getCurrentTime(dom.bgAudio);
+      const dur = audioEngine.getDuration(dom.bgAudio);
+
+      audioEngine.playSyntheticChords(curr);
+
+      if (curr >= dur) {
+        stopPlayback();
+        return;
+      }
+
+      renderer.updateDisplay(curr, dur, lyricTimeline);
+      requestAnimationFrame(renderLoop);
+    }
+
+    function startPlayback() {
+      audioEngine.init();
+      audioEngine.isPlaying = true;
+      dom.btnPlay.textContent = '❚❚ 暫停';
+
+      if (audioEngine.isUsingCustomAudio) {
+        dom.bgAudio.playbackRate = audioEngine.playbackSpeed;
+        dom.bgAudio.play();
+        if (dom.bgVideo.src) dom.bgVideo.muted = true;
+      } else {
+        audioEngine.synthStartTime = audioEngine.audioCtx.currentTime;
+        if (dom.bgVideo.src) dom.bgVideo.muted = false;
+      }
+
+      if (dom.bgVideo.src) {
+        dom.bgVideo.playbackRate = audioEngine.playbackSpeed;
+        dom.bgVideo.play();
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    function pausePlayback() {
+      audioEngine.isPlaying = false;
+      dom.btnPlay.textContent = '▶ 播放';
+
+      if (audioEngine.isUsingCustomAudio) {
+        dom.bgAudio.pause();
+      } else {
+        audioEngine.synthCurrentTime += (audioEngine.audioCtx.currentTime - audioEngine.synthStartTime) * audioEngine.playbackSpeed;
+      }
+
+      if (dom.bgVideo.src) dom.bgVideo.pause();
+    }
+
+    function stopPlayback() {
+      audioEngine.isPlaying = false;
+      dom.btnPlay.textContent = '▶ 播放';
+
+      if (audioEngine.isUsingCustomAudio) {
+        dom.bgAudio.pause();
+        dom.bgAudio.currentTime = 0;
+      } else {
+        audioEngine.synthCurrentTime = 0;
+      }
+
+      if (dom.bgVideo.src) {
+        dom.bgVideo.pause();
+        dom.bgVideo.currentTime = 0;
+      }
+
+      renderer.reset();
+    }
+
+    function seekTo(targetSec) {
+      const dur = audioEngine.getDuration(dom.bgAudio);
+      const clamped = Math.max(0, Math.min(dur, targetSec));
+
+      if (audioEngine.isUsingCustomAudio) {
+        dom.bgAudio.currentTime = clamped;
+      } else {
+        audioEngine.synthCurrentTime = clamped;
+        audioEngine.synthStartTime = audioEngine.audioCtx ? audioEngine.audioCtx.currentTime : 0;
+      }
+
+      if (dom.bgVideo.src) {
+        dom.bgVideo.currentTime = clamped;
+      }
+
+      renderer.updateDisplay(clamped, dur, lyricTimeline);
+    }
+
+    dom.btnPlay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      audioEngine.isPlaying ? pausePlayback() : startPlayback();
+    });
+    dom.btnStop.addEventListener('click', (e) => {
+      e.stopPropagation();
+      stopPlayback();
+    });
+
+    dom.stage.addEventListener('click', (e) => {
+      if (e.target.closest('#denmoku-bar') || e.target.closest('#editor-drawer')) {
+        return;
+      }
+      audioEngine.isPlaying ? pausePlayback() : startPlayback();
+    });
+
+    dom.bgAudio.addEventListener('ended', stopPlayback);
+    dom.bgVideo.addEventListener('ended', stopPlayback);
+
+    dom.seekBar.addEventListener('input', (e) => {
+      seekTo((e.target.value / 100) * audioEngine.getDuration(dom.bgAudio));
+    });
+
+    document.getElementById('btn-step-sub5').addEventListener('click', (e) => { e.stopPropagation(); seekTo(audioEngine.getCurrentTime(dom.bgAudio) - 5); });
+    document.getElementById('btn-step-sub1').addEventListener('click', (e) => { e.stopPropagation(); seekTo(audioEngine.getCurrentTime(dom.bgAudio) - 1); });
+    document.getElementById('btn-step-add1').addEventListener('click', (e) => { e.stopPropagation(); seekTo(audioEngine.getCurrentTime(dom.bgAudio) + 1); });
+    document.getElementById('btn-step-add5').addEventListener('click', (e) => { e.stopPropagation(); seekTo(audioEngine.getCurrentTime(dom.bgAudio) + 5); });
+
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement.tagName === 'INPUT') return;
+      if (e.code === 'ArrowLeft') {
+        seekTo(audioEngine.getCurrentTime(dom.bgAudio) - (e.shiftKey ? 5 : 1));
+      } else if (e.code === 'ArrowRight') {
+        seekTo(audioEngine.getCurrentTime(dom.bgAudio) + (e.shiftKey ? 5 : 1));
+      } else if (e.code === 'Space') {
+        e.preventDefault();
+        editor.tapSyllable(lyricTimeline, audioEngine.getCurrentTime(dom.bgAudio));
+      }
+    });
+
+    const btnToggleMic = document.getElementById('btn-toggle-mic');
+    btnToggleMic.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const depth = parseFloat(document.getElementById('slider-mic-echo').value);
+      const active = await audioEngine.toggleMicrophone(depth);
+      btnToggleMic.classList.toggle('btn-active', active);
+    });
+
+    document.getElementById('slider-mic-echo').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      document.getElementById('echo-val-text').textContent = val + '%';
+      audioEngine.setEchoDepth(val);
+    });
+
+    // 1. 載入背景影片
+    dom.videoInput.addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (f) {
+        if (dom.bgVideo.src && dom.bgVideo.src.startsWith('blob:')) {
+          URL.revokeObjectURL(dom.bgVideo.src);
+        }
+        dom.bgVideo.src = URL.createObjectURL(f);
+        dom.bgVideo.style.display = 'block';
+        dom.bgVideo.load();
+
+        dom.btnVideoLabel.classList.add('btn-active');
+        dom.btnVideoLabel.textContent = '🎬 影片中';
+        dom.btnUnloadVideo.style.display = 'inline-block';
+
+        if (audioEngine.isUsingCustomAudio) {
+          dom.bgVideo.muted = true;
+        }
+
+        dom.bgVideo.onloadedmetadata = () => {
+          syncCurrentDisplay();
+        };
+      }
+    });
+
+    // 卸載背景影片
+    dom.btnUnloadVideo.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dom.bgVideo.pause();
+      if (dom.bgVideo.src && dom.bgVideo.src.startsWith('blob:')) {
+        URL.revokeObjectURL(dom.bgVideo.src);
+      }
+      dom.bgVideo.removeAttribute('src');
+      dom.bgVideo.load();
+      dom.bgVideo.style.display = 'none';
+      dom.videoInput.value = '';
+
+      dom.btnVideoLabel.classList.remove('btn-active');
+      dom.btnVideoLabel.textContent = '📂 影片';
+      dom.btnUnloadVideo.style.display = 'none';
+
+      syncCurrentDisplay();
+    });
+
+    // 2. 載入伴奏音訊
+    dom.audioInput.addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+
+      stopPlayback();
+      if (dom.bgAudio.src && dom.bgAudio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(dom.bgAudio.src);
+      }
+
+      const audioUrl = URL.createObjectURL(f);
+      dom.bgAudio.src = audioUrl;
+      audioEngine.isUsingCustomAudio = true;
+      dom.bgAudio.load();
+
+      dom.btnAudioLabel.classList.add('btn-active');
+      dom.btnAudioLabel.textContent = '🎼 伴奏中';
+      dom.btnUnloadAudio.style.display = 'inline-block';
+
+      if (dom.bgVideo.src) dom.bgVideo.muted = true;
+
+      dom.bgAudio.onloadedmetadata = () => {
+        syncCurrentDisplay();
+        alert(`伴奏載入成功！時長: ${renderer.formatTime(dom.bgAudio.duration)}`);
+      };
+
+      dom.bgAudio.onerror = () => {
+        alert("伴奏音訊載入失敗，請確認檔案格式（建議使用 .mp3 / .wav / .m4a）。");
+      };
+    });
+
+    // 卸載伴奏音訊
+    dom.btnUnloadAudio.addEventListener('click', (e) => {
+      e.stopPropagation();
+      stopPlayback();
+      if (dom.bgAudio.src && dom.bgAudio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(dom.bgAudio.src);
+      }
+      dom.bgAudio.removeAttribute('src');
+      dom.bgAudio.load();
+      audioEngine.isUsingCustomAudio = false;
+      dom.audioInput.value = '';
+
+      dom.btnAudioLabel.classList.remove('btn-active');
+      dom.btnAudioLabel.textContent = '🎵 伴奏';
+      dom.btnUnloadAudio.style.display = 'none';
+
+      if (dom.bgVideo.src) {
+        dom.bgVideo.muted = false;
+      }
+
+      syncCurrentDisplay();
+    });
+
+    // 載入 LRC
+    document.getElementById('lrc-input').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        stopPlayback();
+        renderer.reset();
+
+        lyricTimeline = parseLRC(evt.target.result);
+
+        editor.selectedLine = 0;
+        editor.selectedSyllable = 0;
+        editor.render(lyricTimeline);
+
+        syncCurrentDisplay();
+        alert(`已成功匯入 ${lyricTimeline.length} 行歌詞！`);
+      };
+      reader.readAsText(f);
+      e.target.value = '';
+    });
+
+    // 3. 載入 對齊檔 (支援 .ass 與 .json)
+    dom.alignedInput.addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const content = evt.target.result;
+        let result = null;
+
+        if (f.name.endsWith('.ass') || content.includes('[V4+ Styles]')) {
+          result = parseASS(content);
+        } else {
+          result = parseAlignedJSON(content);
+        }
+
+        if (!result || result.length === 0) {
+          alert("檔案解析失敗，請確認檔案內容！");
+          return;
+        }
+
+        stopPlayback();
+        renderer.reset();
+
+        lyricTimeline = result;
+
+        editor.selectedLine = 0;
+        editor.selectedSyllable = 0;
+        editor.render(lyricTimeline);
+
+        // UI 狀態更新為已載入
+        dom.btnAlignedLabel.classList.add('btn-active');
+        dom.btnAlignedLabel.textContent = '📑 字幕中';
+        dom.btnUnloadAligned.style.display = 'inline-block';
+
+        syncCurrentDisplay();
+        alert(`已成功匯入 ${lyricTimeline.length} 行音拍歌詞資料！`);
+      };
+
+      reader.readAsText(f);
+    });
+
+    // 卸載 對齊檔 (JSON/ASS)
+    dom.btnUnloadAligned.addEventListener('click', (e) => {
+      e.stopPropagation();
+      stopPlayback();
+      renderer.reset();
+
+      // 清空目前歌詞時間軸
+      lyricTimeline = [];
+      editor.selectedLine = 0;
+      editor.selectedSyllable = 0;
+      editor.render(lyricTimeline);
+
+      dom.alignedInput.value = '';
+
+      // UI 復原為預設
+      dom.btnAlignedLabel.classList.remove('btn-active');
+      dom.btnAlignedLabel.textContent = '📥 匯入對齊 (JSON/ASS)';
+      dom.btnUnloadAligned.style.display = 'none';
+
+      syncCurrentDisplay();
+    });
+
+    document.getElementById('btn-toggle-editor').addEventListener('click', (e) => {
+      e.stopPropagation();
+      editor.toggle();
+      editor.render(lyricTimeline);
+    });
+    document.getElementById('btn-close-editor').addEventListener('click', (e) => {
+      e.stopPropagation();
+      editor.close();
+    });
+
+    document.getElementById('btn-dur-sub-big').addEventListener('click', (e) => { e.stopPropagation(); editor.adjustDuration(lyricTimeline, -0.2); });
+    document.getElementById('btn-dur-sub').addEventListener('click', (e) => { e.stopPropagation(); editor.adjustDuration(lyricTimeline, -0.05); });
+    document.getElementById('btn-dur-add').addEventListener('click', (e) => { e.stopPropagation(); editor.adjustDuration(lyricTimeline, 0.05); });
+    document.getElementById('btn-dur-add-big').addEventListener('click', (e) => { e.stopPropagation(); editor.adjustDuration(lyricTimeline, 0.2); });
+
+    document.getElementById('btn-tap-syllable').addEventListener('click', (e) => {
+      e.stopPropagation();
+      editor.tapSyllable(lyricTimeline, audioEngine.getCurrentTime(dom.bgAudio));
+    });
+
+    document.getElementById('btn-apply-editor').addEventListener('click', (e) => {
+      e.stopPropagation();
+      syncCurrentDisplay();
+      alert("時間軸變更已套用至卡拉OK畫面！");
+    });
+
+    document.getElementById('btn-export-json').addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportProjectJSON(lyricTimeline);
+    });
+
+    document.getElementById('btn-fullscreen').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    // 啟動初次掛載
+    editor.render(lyricTimeline);
+    syncCurrentDisplay();
+  </script>
+</body>
+</html>
